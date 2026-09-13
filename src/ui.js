@@ -10,6 +10,7 @@ import {
 } from './config.js';
 import { state, on, getAgent, getTask, save, reset, seedOffice } from './store.js';
 import * as orch from './orchestrator.js';
+import { EndpointBackend } from './backends.js';
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, html) => {
@@ -27,12 +28,13 @@ let filtro = 'tutti';
 export function initUI(worldRef) {
   world = worldRef;
 
-  $('#nome-progetto').textContent = state.project;
+  mostraModalita();
   buildFilters();
   bindTopbar();
   bindPanels();
   bindTabbar();
 
+  on('mode', () => mostraModalita());
   on('agents', () => { renderAgents(); renderDossier(); renderKpi(); });
   on('tasks', () => { renderTasks(); renderAgents(); renderKpi(); renderDossier(); syncScene(); });
   on('feed', () => renderFeed());
@@ -47,6 +49,12 @@ export function initUI(worldRef) {
   syncScene();
   // aggiornamento leggero delle barre di avanzamento
   setInterval(() => { renderTasks(); renderAgents(); renderKpi(); }, 900);
+}
+
+/** Riga sotto il logo: progetto + motore che sta eseguendo gli incarichi. */
+function mostraModalita() {
+  const motore = state.mode === 'endpoint' ? '🔌 agenti veri' : '🎬 simulazione';
+  $('#nome-progetto').textContent = `${state.project} · ${motore}`;
 }
 
 function renderAll() {
@@ -611,16 +619,22 @@ function openSettings() {
           <button type="button" class="opzione${state.mode === 'simulazione' ? ' on' : ''}" data-modo="simulazione">
             <span class="big">🎬</span>Simulazione<small>tutto locale</small></button>
           <button type="button" class="opzione${state.mode === 'endpoint' ? ' on' : ''}" data-modo="endpoint">
-            <span class="big">🔌</span>Endpoint<small>agenti veri</small></button>
+            <span class="big">🔌</span>Agenti veri<small>tramite il ponte</small></button>
         </div>
       </div>
 
-      <label class="field">Indirizzo dell'endpoint
-        <input type="url" id="s-endpoint" placeholder="https://tuo-servizio.example/agenti" value="${esc(state.endpoint)}">
+      <label class="field">Indirizzo del ponte
+        <input type="url" id="s-endpoint" placeholder="http://localhost:4444/api" value="${esc(state.endpoint)}">
       </label>
-      <p class="nota">L'endpoint riceve <code>POST /start</code>, <code>/progress</code> e <code>/finish</code>
-        e riporta l'avanzamento reale dei tuoi agenti. Le chiavi API restano sul tuo server:
-        non inserirle mai qui nel browser.</p>
+      <p class="nota">Con «agenti veri» ogni incarico fa partire un vero agente Claude Code nella
+        cartella di lavoro del ponte (<code>node ponte/server.mjs --cartella …</code>): quello che
+        vedi nell'ufficio è il lavoro che sta davvero succedendo sui file. Nessuna chiave API nel
+        browser: il ponte usa il login della CLI sul tuo computer.</p>
+
+      <div class="task-actions">
+        <button class="mini-btn" id="s-prova">🔍 Prova connessione</button>
+      </div>
+      <div class="nota" id="s-esito"></div>
 
       <button class="big-btn" id="s-ok">Salva</button>
 
@@ -634,6 +648,31 @@ function openSettings() {
       if (!btn) return;
       modo = btn.dataset.modo;
       body.querySelectorAll('[data-modo]').forEach((b) => b.classList.toggle('on', b === btn));
+    });
+
+    const esito = body.querySelector('#s-esito');
+    body.querySelector('#s-prova').addEventListener('click', async () => {
+      const indirizzo = body.querySelector('#s-endpoint').value.trim();
+      if (!indirizzo) { esito.innerHTML = '⚠️ Scrivi prima l\'indirizzo dell\'endpoint.'; return; }
+      esito.textContent = 'Sto bussando al ponte…';
+      try {
+        const dati = await new EndpointBackend(indirizzo).salute();
+        if (dati.ponte !== 'agent-office') {
+          esito.innerHTML = '❓ Qualcosa ha risposto, ma non è un ponte Agent Office. Controlla l\'indirizzo: deve finire con <code>/api</code>.';
+        } else if (!dati.ok) {
+          esito.innerHTML = '⚠️ Il ponte è attivo ma la CLI <code>claude</code> non è installata (o non è autenticata) sul computer che lo ospita.';
+        } else {
+          const strumenti = (dati.strumentiConsentiti || []).length
+            ? `<br>comandi permessi: <code>${esc(dati.strumentiConsentiti.join(' · '))}</code>`
+            : '<br><i>l\'agente può scrivere file ma non eseguire comandi (niente test): vedi ponte/README.md</i>';
+          esito.innerHTML = `✅ <b>Ponte attivo.</b><br>CLI ${esc(dati.cli || '?')} · modello <b>${esc(dati.modello || '?')}</b> · permessi ${esc(dati.permessi || '?')}`
+            + `<br>cartella di lavoro: <code>${esc(dati.cartellaLavoro || '?')}</code>`
+            + `<br>tetto di spesa $${esc(String(dati.budgetUsd ?? '—'))} per incarico${dati.inCorso ? ` · ${dati.inCorso} agenti al lavoro` : ''}`
+            + strumenti;
+        }
+      } catch (err) {
+        esito.innerHTML = `❌ Nessuna risposta: ${esc(err.message)}.<br>Controlla che il ponte sia avviato (<code>node ponte/server.mjs</code>) e che l'indirizzo finisca con <code>/api</code>.`;
+      }
     });
 
     body.querySelector('#s-ok').addEventListener('click', () => {

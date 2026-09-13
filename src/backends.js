@@ -89,7 +89,8 @@ export class SimulatedBackend {
  * ------------------------------------------------------------------ */
 
 /**
- * Contratto atteso dal tuo servizio:
+ * Contratto atteso dal servizio (lo implementa già `ponte/server.mjs`):
+ *   GET  {endpoint}/salute                     -> { ok, cli, cartellaLavoro, modello, … }
  *   POST {endpoint}/start     { task, agent }  -> { runId }
  *   POST {endpoint}/progress  { runId }        -> { progress: 0..1, lines: string[], done: bool, blocked?: string }
  *   POST {endpoint}/finish    { runId }        -> {}
@@ -101,44 +102,65 @@ export class EndpointBackend {
   constructor(baseUrl) {
     this.id = 'endpoint';
     this.label = 'Endpoint remoto';
-    this.baseUrl = baseUrl.replace(/\/+$/, '');
+    this.base = new URL(baseUrl);                      // può contenere ?chiave=…
+    this.base.pathname = this.base.pathname.replace(/\/+$/, '');
     this.runs = new Map();
   }
 
-  async #post(path, body) {
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`${path} → HTTP ${res.status}`);
-    return res.json();
+  /** Indirizzo completo di una rotta, conservando gli eventuali parametri. */
+  #rotta(coda) {
+    const url = new URL(this.base.toString());
+    url.pathname = `${url.pathname}${coda}`;
+    return url.toString();
   }
+
+  #intestazioni() {
+    const testate = { 'content-type': 'application/json' };
+    const chiave = this.base.searchParams.get('chiave');
+    if (chiave) testate['x-chiave'] = chiave;
+    return testate;
+  }
+
+  async #chiama(coda, corpo, metodo = 'POST') {
+    const res = await fetch(this.#rotta(coda), {
+      method: metodo,
+      headers: this.#intestazioni(),
+      body: metodo === 'GET' ? undefined : JSON.stringify(corpo || {}),
+    });
+    const testo = await res.text();
+    let dati = {};
+    try { dati = testo ? JSON.parse(testo) : {}; } catch { /* risposta non JSON */ }
+    if (!res.ok) throw new Error(dati.errore || `HTTP ${res.status}`);
+    return dati;
+  }
+
+  /** Usata dal pulsante «Prova connessione» nelle impostazioni. */
+  salute() { return this.#chiama('/salute', null, 'GET'); }
 
   async start(task, agent) {
-    const data = await this.#post('/start', { task, agent });
-    this.runs.set(task.id, { runId: data.runId || task.id, last: 0 });
+    const dati = await this.#chiama('/start', { task, agent });
+    this.runs.set(task.id, { runId: dati.runId || task.id, last: 0, cooldown: 0 });
   }
 
-  async progress(task, agent, dt, rate) {
+  async progress(task, agent, dt) {
     const run = this.runs.get(task.id);
     if (!run) return { delta: 0 };
-    run.cooldown = (run.cooldown || 0) - dt;
+    run.cooldown -= dt;
     if (run.cooldown > 0) return { delta: 0 };
-    run.cooldown = 1.2; // interroga il servizio ~una volta al secondo
+    run.cooldown = 1.2;                                // ~una richiesta al secondo
     try {
-      const data = await this.#post('/progress', { runId: run.runId });
-      const pct = Math.max(0, Math.min(1, Number(data.progress) || 0));
+      const dati = await this.#chiama('/progress', { runId: run.runId });
+      const pct = Math.max(0, Math.min(1, Number(dati.progress) || 0));
       const delta = Math.max(0, pct - run.last) * task.workTotal;
       run.last = pct;
       return {
         delta,
-        line: Array.isArray(data.lines) && data.lines.length ? data.lines.join(' · ').slice(0, 160) : undefined,
-        done: Boolean(data.done),
-        blocked: data.blocked ? String(data.blocked) : false,
+        lines: Array.isArray(dati.lines) ? dati.lines : undefined,
+        done: Boolean(dati.done),
+        blocked: dati.blocked ? String(dati.blocked) : false,
       };
     } catch (err) {
-      return { delta: 0, line: `⚠️ endpoint non raggiungibile (${err.message})`, blocked: 'endpoint non raggiungibile' };
+      return { delta: 0, blocked: `ponte non raggiungibile (${err.message})` };
     }
   }
 
@@ -146,6 +168,6 @@ export class EndpointBackend {
     const run = this.runs.get(task.id);
     if (!run) return;
     this.runs.delete(task.id);
-    try { await this.#post('/finish', { runId: run.runId }); } catch { /* best effort */ }
+    try { await this.#chiama('/finish', { runId: run.runId }); } catch { /* best effort */ }
   }
 }

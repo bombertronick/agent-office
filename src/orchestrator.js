@@ -117,7 +117,9 @@ export function assign(taskId, agentId) {
   task.startedAt = task.startedAt || new Date().toISOString();
   agent.taskId = task.id;
   agent.status = 'lavora';
-  backend.start(task, agent).catch(() => {});
+  // Se il motore non parte (ponte spento, cartella sbagliata…) l'incarico si
+  // blocca subito invece di restare fermo allo 0% senza spiegazioni.
+  backend.start(task, agent).catch((err) => blockTask(task, agent, `avvio non riuscito: ${err.message}`));
   log({ kind: 'direttrice', who: 'Claude', text: DIRECTOR_LINES.assign(agent.name, task.title), taskId: task.id });
   say(agent, pick(PHRASES.start));
   emit('tasks'); emit('agents');
@@ -344,6 +346,9 @@ function progressTask(agent, dt) {
       if (!res) return;
       task.work = Math.min(task.workTotal, task.work + (res.delta || 0));
       if (res.line) log({ kind: 'agente', who: agent.name, text: res.line, taskId: task.id });
+      if (Array.isArray(res.lines)) {
+        res.lines.forEach((riga) => log({ kind: 'agente', who: agent.name, text: riga, taskId: task.id }));
+      }
       if (res.blocked) { blockTask(task, agent, typeof res.blocked === 'string' ? res.blocked : null); return; }
       if (res.done || task.work >= task.workTotal) sendToReview(task, agent);
       emit('progress', task.id);

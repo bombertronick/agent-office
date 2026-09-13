@@ -75,21 +75,30 @@ giri, poi si chiude).
 
 ## Collegare agenti veri
 
-In *Impostazioni* puoi passare da simulazione a **endpoint**: un tuo servizio che
-esegue gli agenti — per esempio un proxy che parla con l'API di Claude o con il
-Claude Agent SDK.
+In *Impostazioni* si passa da **simulazione** ad **agenti veri**: ogni incarico
+aperto nell'ufficio fa partire un agente Claude Code vero in una cartella del tuo
+computer, e il registro mostra il lavoro che sta davvero succedendo sui file.
+
+```bash
+node ponte/server.mjs --cartella ~/progetti/mia-app
+# poi apri http://localhost:4444/ e in ⚙️ Impostazioni incolla http://localhost:4444/api
+```
+
+Il ponte serve anche l'app, quindi non c'è niente da configurare lato browser, e
+**nessuna chiave API sta nel browser**: usa il login della CLI (`claude auth login`)
+sul tuo computer. Istruzioni complete, permessi, uso dal telefono e inoltro a una
+sessione già aperta: **[`ponte/README.md`](ponte/README.md)**.
+
+Il contratto HTTP è minimo, quindi al posto del ponte puoi mettere un tuo servizio:
 
 ```
-POST {endpoint}/start      { task, agent }  →  { runId }
-POST {endpoint}/progress   { runId }        →  { progress: 0..1, lines: [], done: bool, blocked?: "motivo" }
-POST {endpoint}/finish     { runId }        →  { }
+GET  {endpoint}/salute                     → { ok, cli, cartellaLavoro, modello, … }
+POST {endpoint}/start      { task, agent } → { runId }
+POST {endpoint}/progress   { runId }       → { progress: 0..1, lines: [], done, blocked? }
+POST {endpoint}/finish     { runId }       → { }
 ```
 
-`progress` è l'avanzamento da 0 a 1, `lines` le righe da mostrare nel registro.
-L'adattatore sta in [`src/backends.js`](src/backends.js).
-
-> ⚠️ L'endpoint deve stare su un tuo server: **le chiavi API non vanno mai messe
-> nel browser**, è il servizio a custodirle.
+L'adattatore lato app sta in [`src/backends.js`](src/backends.js).
 
 ## Com'è fatto
 
@@ -99,6 +108,7 @@ Niente framework, niente passo di build: moduli ES nativi e
 ```
 .
 ├─ index.html            guscio dell'app + import map
+├─ ponte/server.mjs      ponte verso gli agenti veri (Node, zero dipendenze)
 ├─ assets/ui.css         interfaccia "cartoon"
 ├─ src/
 │  ├─ config.js          ruoli, tipi di incarico, palette, pianta dell'ufficio
