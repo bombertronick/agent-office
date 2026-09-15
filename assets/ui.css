@@ -445,6 +445,19 @@ select option { background: var(--panel-solid); }
 .big-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #c25c33; }
 .nota { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
 
+.memoria-testo {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid var(--panel-line);
+  font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 56vh;
+  overflow: auto;
+}
+
 /* ---------------------------------------------------------------- avvio */
 
 .boot {

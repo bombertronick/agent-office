@@ -100,6 +100,30 @@ POST {endpoint}/finish     { runId }       → { }
 
 L'adattatore lato app sta in [`src/backends.js`](src/backends.js).
 
+## Mantenere il contesto fra sessioni
+
+Ogni sessione di Claude Code parte da zero, e i container si riciclano: quello che
+resta solo nella chat o in una cartella non spinta, il giorno dopo non c'è più.
+La memoria automatica di Claude Code non aiuta qui: è locale alla macchina e non
+passa fra sessioni cloud. La risposta è un file piccolo, dentro il repository:
+
+- **`MEMORIA.md`** — stato attuale, dove sta il lavoro, decisioni prese, domande in
+  sospeso, prossimi passi in ordine, vincoli, diario. Massimo 6.000 caratteri.
+- **`CLAUDE.md`** la importa con `@MEMORIA.md`: viene caricata all'avvio di ogni
+  sessione — web, terminale, agenti del ponte — e riletta anche dopo `/compact`.
+- **`strumenti/memoria.mjs`** la tiene in ordine:
+
+```bash
+node strumenti/memoria.mjs                    # controlla e riassume lo stato
+node strumenti/memoria.mjs chiudi "cosa ho fatto"   # diario + data + commit + push
+node strumenti/memoria.mjs nuovo "Nome progetto"    # crea MEMORIA.md e CLAUDE.md dai modelli
+```
+
+Il ponte fa la sua parte: ogni agente riceve l'istruzione di aggiornare `MEMORIA.md`
+prima di chiudere, e a fine incarico il ponte la committa e la spinge da solo (solo
+quel file). Per portare il sistema in un altro progetto bastano i due modelli in
+[`modelli/`](modelli/) e lo strumento.
+
 ## Com'è fatto
 
 Niente framework, niente passo di build: moduli ES nativi e
@@ -109,6 +133,9 @@ Niente framework, niente passo di build: moduli ES nativi e
 .
 ├─ index.html            guscio dell'app + import map
 ├─ ponte/server.mjs      ponte verso gli agenti veri (Node, zero dipendenze)
+├─ MEMORIA.md            memoria fra sessioni (importata da CLAUDE.md)
+├─ strumenti/memoria.mjs controlla / chiude / crea la memoria
+├─ modelli/              MEMORIA.md e CLAUDE.md da copiare in un progetto nuovo
 ├─ assets/ui.css         interfaccia "cartoon"
 ├─ src/
 │  ├─ config.js          ruoli, tipi di incarico, palette, pianta dell'ufficio

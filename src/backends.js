@@ -137,6 +137,9 @@ export class EndpointBackend {
   /** Usata dal pulsante «Prova connessione» nelle impostazioni. */
   salute() { return this.#chiama('/salute', null, 'GET'); }
 
+  /** MEMORIA.md del progetto su cui lavorano gli agenti. */
+  memoria() { return this.#chiama('/memoria', null, 'GET'); }
+
   async start(task, agent) {
     const dati = await this.#chiama('/start', { task, agent });
     this.runs.set(task.id, { runId: dati.runId || task.id, last: 0, cooldown: 0 });

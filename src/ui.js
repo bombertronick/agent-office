@@ -398,6 +398,7 @@ function bindTopbar() {
   });
 
   $('#btn-impostazioni').addEventListener('click', openSettings);
+  $('#btn-memoria').addEventListener('click', openMemoria);
 }
 
 function bindPanels() {
@@ -604,6 +605,38 @@ function openConfirm(titolo, testo, onOk) {
     const ok = el('button', 'big-btn', 'Confermo');
     ok.addEventListener('click', () => { onOk(); close(); });
     body.appendChild(ok);
+  });
+}
+
+/** La memoria fra sessioni del progetto su cui lavorano gli agenti. */
+async function openMemoria() {
+  openModal('📓 Memoria del progetto', async (body) => {
+    if (state.mode !== 'endpoint' || !state.endpoint) {
+      body.innerHTML = `
+        <p class="nota">La memoria è il file <code>MEMORIA.md</code> del progetto su cui lavorano gli agenti:
+        stato attuale, decisioni, domande in sospeso, prossimi passi. Ogni sessione di Claude Code la legge
+        all'avvio e gli agenti del ponte la aggiornano prima di chiudere.</p>
+        <p class="nota">Qui in <b>simulazione</b> non c'è un progetto vero da leggere. Collega il ponte
+        (⚙️ Impostazioni → Agenti veri) e questo pulsante mostrerà la memoria della cartella di lavoro.</p>`;
+      return;
+    }
+    body.innerHTML = '<p class="nota">Leggo la memoria dal ponte…</p>';
+    try {
+      const dati = await new EndpointBackend(state.endpoint).memoria();
+      if (!dati.esiste) {
+        body.innerHTML = `<p class="nota">Nella cartella di lavoro del ponte non c'è ancora <code>MEMORIA.md</code>.
+          Creala dal computer con <code>node strumenti/memoria.mjs nuovo "Nome progetto"</code>: da quel momento ogni
+          agente la aggiorna e il ponte la spinge a fine incarico.</p>`;
+        return;
+      }
+      const pre = el('pre', 'memoria-testo');
+      pre.textContent = dati.testo;
+      body.innerHTML = `<p class="nota">Aggiornata il <b>${esc(dati.aggiornato || '?')}</b> · ${dati.caratteri} caratteri
+        (limite 6.000). È il file <code>MEMORIA.md</code> della cartella di lavoro: modificalo lì, non qui.</p>`;
+      body.appendChild(pre);
+    } catch (err) {
+      body.innerHTML = `<p class="nota">❌ Il ponte non risponde: ${esc(err.message)}</p>`;
+    }
   });
 }
 

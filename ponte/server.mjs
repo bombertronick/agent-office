@@ -46,6 +46,7 @@ const PREDEFINITA = {
   budgetUsd: 1.5,
   chiave: '',                // se valorizzata, va passata come ?chiave=… dall'app
   strumentiConsentiti: [],   // es. ["Bash(npm test)", "Bash(npm run *)"] — eseguiti senza chiedere
+  memoria: true,             // a fine incarico committa e spinge MEMORIA.md se è cambiata
   sessioniCloud: {},         // { "nome-corto": "session_0123…" }
 };
 
@@ -55,6 +56,7 @@ function leggiArgomenti(argv) {
     '--porta': 'porta', '--host': 'host', '--cartella': 'cartellaLavoro',
     '--modello': 'modello', '--permessi': 'permessi', '--max-turni': 'maxTurni',
     '--budget': 'budgetUsd', '--chiave': 'chiave', '--strumenti': 'strumentiConsentiti',
+    '--memoria': 'memoria',
   };
   for (let i = 2; i < argv.length; i += 1) {
     const chiave = mappa[argv[i]];
@@ -64,6 +66,7 @@ function leggiArgomenti(argv) {
     if (['porta', 'maxTurni'].includes(chiave)) out[chiave] = Number(valore);
     else if (chiave === 'budgetUsd') out[chiave] = Number(valore);
     else if (chiave === 'strumentiConsentiti') out[chiave] = valore.split(',').map((v) => v.trim()).filter(Boolean);
+    else if (chiave === 'memoria') out[chiave] = !['no', 'off', 'false', '0'].includes(valore.toLowerCase());
     else out[chiave] = valore;
     i += 1;
   }
@@ -143,6 +146,9 @@ function costruisciPrompt(task, agent) {
     '- lavora in autonomia fino a consegnare: non chiedere conferme per ogni passo;',
     '- se il progetto ha test o linter, eseguili prima di considerare finito il lavoro;',
     '- non fare commit e non spingere niente: lascia le modifiche nella cartella di lavoro;',
+    '- se nella cartella esiste MEMORIA.md, prima di chiudere aggiorna «Stato adesso» e',
+    '  aggiungi una riga in cima al «Diario» (data · cosa hai fatto): è l\'unica memoria',
+    '  che sopravvive a questa sessione; non toccare le altre sezioni se non serve;',
     '- quando hai finito, chiudi con una riga che riassume cosa hai cambiato;',
     '- se davvero non puoi procedere (informazione mancante, decisione di prodotto,',
     '  credenziali assenti), fermati e spiega in una riga cosa ti serve.',
@@ -264,11 +270,34 @@ function avvia(task, agent) {
     }
     const durata = Math.round((Date.now() - lavoro.iniziato) / 1000);
     lavoro.righe.push(`agente concluso in ${durata}s · costo $${lavoro.costo.toFixed(3)}`);
+    if (config.memoria) lavoro.righe.push(...salvaMemoria(task.title));
     console.log(`  ↳ [${lavoro.agente}] «${lavoro.titolo}» ${lavoro.bloccato ? 'FERMO' : 'fatto'} (${durata}s, $${lavoro.costo.toFixed(3)})`);
   });
 
   console.log(`▶ [${lavoro.agente}] «${task.title}» → ${config.cartellaLavoro}`);
   return lavoro;
+}
+
+/**
+ * Memoria fra sessioni: se l'agente ha toccato MEMORIA.md, il ponte la committa e
+ * la spinge da solo. È l'unica eccezione alla regola «gli agenti non committano»:
+ * una memoria che resta solo nella cartella è una memoria persa.
+ */
+function salvaMemoria(titolo) {
+  const git = (...args) => spawnSync('git', args, { cwd: config.cartellaLavoro, encoding: 'utf8' });
+  if (!existsSync(path.join(config.cartellaLavoro, 'MEMORIA.md'))) return [];
+  if (git('rev-parse', '--is-inside-work-tree').status !== 0) return ['MEMORIA.md aggiornata (cartella senza git: non spinta)'];
+  const diff = git('status', '--porcelain', '--', 'MEMORIA.md');
+  if (!diff.stdout.trim()) return ['MEMORIA.md non toccata dall\'agente'];
+  git('add', 'MEMORIA.md');
+  const commit = git('commit', '-m', `memoria: ${titolo.slice(0, 60)}`, '--', 'MEMORIA.md');
+  if (commit.status !== 0) return [`memoria: commit fallito (${(commit.stderr || '').trim().split('\n')[0]})`];
+  if (!git('remote').stdout.trim()) return ['memoria: commit locale (nessun remoto)'];
+  const ramo = git('rev-parse', '--abbrev-ref', 'HEAD').stdout.trim();
+  const push = git('push', '-u', 'origin', ramo);
+  return [push.status === 0
+    ? `memoria: commit e push su ${ramo} ✓`
+    : `memoria: commit fatto, push fallito (${(push.stderr || '').trim().split('\n').slice(-1)[0]})`];
 }
 
 /**
@@ -375,10 +404,24 @@ const server = createServer(async (req, res) => {
       modello: config.modello,
       permessi: config.permessi,
       strumentiConsentiti: config.strumentiConsentiti || [],
+      memoria: Boolean(config.memoria) && existsSync(path.join(config.cartellaLavoro, 'MEMORIA.md')),
       budgetUsd: config.budgetUsd,
       inCorso: [...lavori.values()].filter((l) => !l.finito).length,
       sessioniCloud: Object.keys(config.sessioniCloud || {}),
     });
+    return;
+  }
+
+  // la memoria del progetto, così l'ufficio la mostra senza passare da git
+  if (url.pathname === '/api/memoria') {
+    const percorso = path.join(config.cartellaLavoro, 'MEMORIA.md');
+    try {
+      const testo = await readFile(percorso, 'utf8');
+      const data = /\(aggiornato:\s*(\d{4}-\d{2}-\d{2})\)/.exec(testo);
+      rispondi(res, 200, { esiste: true, testo, aggiornato: data?.[1] || null, caratteri: testo.length });
+    } catch {
+      rispondi(res, 200, { esiste: false, testo: '', aggiornato: null, caratteri: 0 });
+    }
     return;
   }
 
@@ -460,6 +503,9 @@ server.listen(config.porta, config.host, () => {
     console.log('                    Per farglieli eseguire: --strumenti "Bash(npm test),Bash(npm run *)"');
   }
   console.log(`  tetto di spesa    $${config.budgetUsd} per incarico`);
+  console.log(`  memoria           ${existsSync(path.join(config.cartellaLavoro, 'MEMORIA.md'))
+    ? (config.memoria ? 'MEMORIA.md trovata: la committo e spingo a fine incarico' : 'MEMORIA.md trovata (commit automatico spento)')
+    : 'nessuna MEMORIA.md nella cartella — crea la memoria con: node strumenti/memoria.mjs nuovo "Nome"'}`);
   console.log(`  CLI claude        ${versioneCli || '✖ non trovata — installa Claude Code e fai `claude auth login`'}`);
   if (config.host === '0.0.0.0' && !config.chiave) {
     console.log('\n  ⚠ in ascolto su tutta la rete senza chiave: chiunque sia in rete può far');
