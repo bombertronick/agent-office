@@ -20,6 +20,7 @@ function boot() {
     log({ kind: 'direttrice', who: 'Claude', text: 'Bentornato: ho ripreso in mano la bacheca dove l\'avevamo lasciata.' });
   }
   if (state.mode === 'endpoint' && state.endpoint) orch.setBackend('endpoint', state.endpoint);
+  if (state.mode === 'cloud' && state.cloud?.relay) orch.setBackend('cloud', state.cloud);
 
   const world = createWorld(canvas, labels);
   initUI(world);

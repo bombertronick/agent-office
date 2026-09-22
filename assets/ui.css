@@ -334,6 +334,7 @@ body.con-dossier .panel-left { max-height: calc(100vh - 430px); }
   border-radius: 10px;
 }
 .mini-btn:hover { background: rgba(255, 255, 255, .18); }
+a.mini-btn { text-decoration: none; color: inherit; display: inline-block; }
 .mini-btn.danger { background: rgba(249, 112, 102, .2); border-color: rgba(249, 112, 102, .5); }
 .mini-btn.primary { background: var(--accent-2); border-color: transparent; color: #fff; }
 

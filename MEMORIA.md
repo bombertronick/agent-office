@@ -5,11 +5,12 @@
 > la prossima sessione non lo sa. Massimo 6.000 caratteri: i dettagli vanno in
 > `README.md` / `ponte/README.md` e qui resta il puntatore.
 
-## Stato adesso (aggiornato: 2026-09-15)
-Ufficio 3D funzionante e online su GitHub Pages. Il ponte per agenti veri esiste,
-è documentato ed è stato provato una volta sul serio (un agente ha scritto codice e
-test veri in 108 s). Il sistema di memoria fra sessioni (questo file + `strumenti/
-memoria.mjs`) è appena nato: prima applicazione qui e su Supply Chain Pro.
+## Stato adesso (aggiornato: 2026-09-22)
+Ufficio 3D online su GitHub Pages; ponte locale provato sul serio; memoria fra
+sessioni attiva. Nuovo: **motore cloud** — ogni incarico avvia una sessione Claude
+Code via Routine (trigger API) passando da un relè serverless in `api/` su Vercel.
+Codice pronto e sintatticamente verificato; **non ancora provato end-to-end**: serve
+la Routine creata da Valerio (token visibile una volta sola) e le variabili su Vercel.
 
 ## Dove sta il lavoro
 - codice: `bombertronick/agent-office`, ramo `main` (si lavora direttamente su main:
@@ -21,6 +22,11 @@ memoria.mjs`) è appena nato: prima applicazione qui e su Supply Chain Pro.
   da cancellare dall'interfaccia GitHub — il proxy delle sessioni rifiuta i `push --delete`
 
 ## Decisioni prese (e perché)
+- 2026-09-22 — orchestrazione dal telefono = Routine di Claude Code con trigger API +
+  relè Vercel nello stesso repository. L'endpoint /fire non ha CORS (verificato: il
+  preflight risponde 405 senza Access-Control-*), quindi il browser non può chiamarlo;
+  il relè tiene il token. Avanzamento letto da GitHub (commit = registro, PR = consegna)
+  perché non esiste un'API per leggere le sessioni.
 - 2026-09-13 — repository dedicato, app alla radice: `Nuovo` ospita il gestionale
   cantieri; mescolare le due app avrebbe complicato Pages e la storia.
 - 2026-09-13 — three.js incluso in `vendor/`, niente CDN: le sessioni cloud non
@@ -40,6 +46,8 @@ memoria.mjs`) è appena nato: prima applicazione qui e su Supply Chain Pro.
   memoria di quel progetto.
 
 ## Prossimi passi, in ordine
+0. Provare il motore cloud end-to-end: Routine creata, variabili su Vercel, un incarico
+   piccolo, verificare ramo → commit → pull request nell'ufficio.
 1. Provare `node strumenti/memoria.mjs chiudi` dentro il ponte a fine incarico, con un
    agente vero (finora provato solo a mano).
 2. Dipendenze fra incarichi (un agente che aspetta il lavoro di un altro):
@@ -54,6 +62,8 @@ memoria.mjs`) è appena nato: prima applicazione qui e su Supply Chain Pro.
   `config.js`: se sposti le scrivanie, aggiornale insieme.
 
 ## Diario (le ultime dieci righe, la più recente in alto)
+- 2026-09-22 · motore cloud: CloudBackend, relè api/ (fire, salute, proxy GitHub),
+  impostazioni a tre motori, link a sessione e PR sugli incarichi, cloud/README.md
 - 2026-09-15 · sistema di memoria fra sessioni: MEMORIA.md, CLAUDE.md che la importa,
   strumenti/memoria.mjs, il ponte che la committa a fine incarico
 - 2026-09-13 · ponte agenti veri (`ponte/server.mjs`), provato end-to-end; prova di

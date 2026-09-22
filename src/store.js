@@ -64,8 +64,9 @@ export const state = {
   feed: [],          // registro attività (voci più recenti in testa)
   speed: 1,          // 0 = pausa, 1 = normale, 2, 4
   selectedAgentId: null,
-  mode: 'simulazione', // 'simulazione' | 'endpoint'
+  mode: 'simulazione', // 'simulazione' | 'endpoint' | 'cloud'
   endpoint: '',
+  cloud: { relay: '', repo: '', chiave: '' },
   stats: { completati: 0, bugTrovati: 0, revisioni: 0, giorno: 1 },
   clock: 0,          // secondi simulati
   createdAt: nowIso(),
@@ -187,6 +188,7 @@ export function save() {
         clock: state.clock,
         mode: state.mode,
         endpoint: state.endpoint,
+        cloud: state.cloud,
         createdAt: state.createdAt,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
@@ -208,8 +210,9 @@ export function load() {
     state.feed = Array.isArray(data.feed) ? data.feed : [];
     state.stats = { ...state.stats, ...(data.stats || {}) };
     state.clock = data.clock || 0;
-    state.mode = data.mode === 'endpoint' ? 'endpoint' : 'simulazione';
+    state.mode = ['endpoint', 'cloud'].includes(data.mode) ? data.mode : 'simulazione';
     state.endpoint = data.endpoint || '';
+    state.cloud = { relay: '', repo: '', chiave: '', ...(data.cloud || {}) };
     state.createdAt = data.createdAt || nowIso();
     // Al riavvio nessuno è "in cammino": tutti rientrano alla scrivania.
     state.agents.forEach((a) => {

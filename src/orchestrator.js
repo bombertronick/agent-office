@@ -13,7 +13,7 @@ import {
 import {
   state, createAgent, createTask, getAgent, getTask, log, save, emit, agentTask,
 } from './store.js';
-import { SimulatedBackend, EndpointBackend, techLine } from './backends.js';
+import { SimulatedBackend, EndpointBackend, CloudBackend, techLine } from './backends.js';
 
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -24,12 +24,18 @@ let chatterCooldown = 6;
 
 export function getBackend() { return backend; }
 
-export function setBackend(mode, endpoint = '') {
-  if (mode === 'endpoint' && endpoint) {
-    backend = new EndpointBackend(endpoint);
+export function setBackend(mode, opzioni = '') {
+  if (mode === 'cloud') {
+    const conf = typeof opzioni === 'object' ? opzioni : state.cloud;
+    state.cloud = { relay: '', repo: '', chiave: '', ...conf };
+    backend = new CloudBackend(state.cloud);
+    state.mode = 'cloud';
+    log({ kind: 'direttrice', who: 'Claude', text: `Da ora gli incarichi partono nel cloud su ${state.cloud.repo || '(repository da impostare)'}.` });
+  } else if (mode === 'endpoint' && opzioni) {
+    backend = new EndpointBackend(opzioni);
     state.mode = 'endpoint';
-    state.endpoint = endpoint;
-    log({ kind: 'direttrice', who: 'Claude', text: `Collego la squadra all'endpoint ${endpoint}.` });
+    state.endpoint = opzioni;
+    log({ kind: 'direttrice', who: 'Claude', text: `Collego la squadra al ponte ${opzioni}.` });
   } else {
     backend = new SimulatedBackend();
     state.mode = 'simulazione';
@@ -119,7 +125,12 @@ export function assign(taskId, agentId) {
   agent.status = 'lavora';
   // Se il motore non parte (ponte spento, cartella sbagliata…) l'incarico si
   // blocca subito invece di restare fermo allo 0% senza spiegazioni.
-  backend.start(task, agent).catch((err) => blockTask(task, agent, `avvio non riuscito: ${err.message}`));
+  backend.start(task, agent, { ruoloLabel: ROLES[agent.role]?.label, tratti: ROLES[agent.role]?.traits?.join(', ') })
+    .then((res) => {
+      if (Array.isArray(res?.lines)) res.lines.forEach((riga) => log({ kind: 'agente', who: agent.name, text: riga, taskId: task.id }));
+      emit('tasks');
+    })
+    .catch((err) => blockTask(task, agent, `avvio non riuscito: ${err.message}`));
   log({ kind: 'direttrice', who: 'Claude', text: DIRECTOR_LINES.assign(agent.name, task.title), taskId: task.id });
   say(agent, pick(PHRASES.start));
   emit('tasks'); emit('agents');

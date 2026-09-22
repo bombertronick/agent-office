@@ -1,0 +1,6 @@
+{
+  "name": "agent-office",
+  "private": true,
+  "type": "module",
+  "description": "Studio 3D per orchestrare agenti di programmazione. Nessuna dipendenza: il package.json serve solo a dire a Vercel che le funzioni in api/ sono moduli ES."
+}

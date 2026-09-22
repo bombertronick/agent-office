@@ -10,7 +10,7 @@ import {
 } from './config.js';
 import { state, on, getAgent, getTask, save, reset, seedOffice } from './store.js';
 import * as orch from './orchestrator.js';
-import { EndpointBackend } from './backends.js';
+import { EndpointBackend, CloudBackend } from './backends.js';
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, html) => {
@@ -53,7 +53,7 @@ export function initUI(worldRef) {
 
 /** Riga sotto il logo: progetto + motore che sta eseguendo gli incarichi. */
 function mostraModalita() {
-  const motore = state.mode === 'endpoint' ? '🔌 agenti veri' : '🎬 simulazione';
+  const motore = { endpoint: '🔌 agenti veri', cloud: '☁️ cloud' }[state.mode] || '🎬 simulazione';
   $('#nome-progetto').textContent = `${state.project} · ${motore}`;
 }
 
@@ -231,7 +231,7 @@ function renderTasks() {
   const box = $('#lista-incarichi');
   const tasks = tasksVisibili();
   // la struttura si ricostruisce solo quando cambia davvero qualcosa
-  const firma = `${filtro}|${tasks.map((t) => `${t.id}:${t.status}:${t.assignee}:${t.reviewer}`).join(',')}`;
+  const firma = `${filtro}|${tasks.map((t) => `${t.id}:${t.status}:${t.assignee}:${t.reviewer}:${t.sessionUrl ? 1 : 0}${t.prUrl ? 1 : 0}`).join(',')}`;
 
   if (firma !== firmaBacheca) {
     firmaBacheca = firma;
@@ -611,7 +611,9 @@ function openConfirm(titolo, testo, onOk) {
 /** La memoria fra sessioni del progetto su cui lavorano gli agenti. */
 async function openMemoria() {
   openModal('📓 Memoria del progetto', async (body) => {
-    if (state.mode !== 'endpoint' || !state.endpoint) {
+    const motoreCloud = state.mode === 'cloud' && state.cloud?.relay;
+    const motorePonte = state.mode === 'endpoint' && state.endpoint;
+    if (!motoreCloud && !motorePonte) {
       body.innerHTML = `
         <p class="nota">La memoria è il file <code>MEMORIA.md</code> del progetto su cui lavorano gli agenti:
         stato attuale, decisioni, domande in sospeso, prossimi passi. Ogni sessione di Claude Code la legge
@@ -620,11 +622,13 @@ async function openMemoria() {
         (⚙️ Impostazioni → Agenti veri) e questo pulsante mostrerà la memoria della cartella di lavoro.</p>`;
       return;
     }
-    body.innerHTML = '<p class="nota">Leggo la memoria dal ponte…</p>';
+    body.innerHTML = `<p class="nota">Leggo la memoria ${motoreCloud ? 'dal repository' : 'dal ponte'}…</p>`;
     try {
-      const dati = await new EndpointBackend(state.endpoint).memoria();
+      const dati = motoreCloud
+        ? await new CloudBackend(state.cloud).memoria()
+        : await new EndpointBackend(state.endpoint).memoria();
       if (!dati.esiste) {
-        body.innerHTML = `<p class="nota">Nella cartella di lavoro del ponte non c'è ancora <code>MEMORIA.md</code>.
+        body.innerHTML = `<p class="nota">${motoreCloud ? `Nel repository <code>${esc(state.cloud.repo)}</code>` : 'Nella cartella di lavoro del ponte'} non c'è ancora <code>MEMORIA.md</code>.
           Creala dal computer con <code>node strumenti/memoria.mjs nuovo "Nome progetto"</code>: da quel momento ogni
           agente la aggiorna e il ponte la spinge a fine incarico.</p>`;
         return;
@@ -632,10 +636,10 @@ async function openMemoria() {
       const pre = el('pre', 'memoria-testo');
       pre.textContent = dati.testo;
       body.innerHTML = `<p class="nota">Aggiornata il <b>${esc(dati.aggiornato || '?')}</b> · ${dati.caratteri} caratteri
-        (limite 6.000). È il file <code>MEMORIA.md</code> della cartella di lavoro: modificalo lì, non qui.</p>`;
+        (limite 6.000). È il file <code>MEMORIA.md</code> ${motoreCloud ? 'sul ramo principale del repository' : 'della cartella di lavoro'}: si modifica lì, non qui.</p>`;
       body.appendChild(pre);
     } catch (err) {
-      body.innerHTML = `<p class="nota">❌ Il ponte non risponde: ${esc(err.message)}</p>`;
+      body.innerHTML = `<p class="nota">❌ Lettura fallita: ${esc(err.message)}</p>`;
     }
   });
 }
@@ -652,9 +656,28 @@ function openSettings() {
           <button type="button" class="opzione${state.mode === 'simulazione' ? ' on' : ''}" data-modo="simulazione">
             <span class="big">🎬</span>Simulazione<small>tutto locale</small></button>
           <button type="button" class="opzione${state.mode === 'endpoint' ? ' on' : ''}" data-modo="endpoint">
-            <span class="big">🔌</span>Agenti veri<small>tramite il ponte</small></button>
+            <span class="big">🔌</span>Ponte locale<small>PC acceso</small></button>
+          <button type="button" class="opzione${state.mode === 'cloud' ? ' on' : ''}" data-modo="cloud">
+            <span class="big">☁️</span>Cloud<small>Routine, dal telefono</small></button>
         </div>
       </div>
+
+      <div id="s-blocco-cloud" ${state.mode === 'cloud' ? '' : 'hidden'}>
+        <label class="field">Indirizzo del relè (l'app su Vercel)
+          <input type="url" id="s-relay" placeholder="https://agent-office.vercel.app/api" value="${esc(state.cloud?.relay || (location.hostname.endsWith('vercel.app') ? `${location.origin}/api` : ''))}">
+        </label>
+        <label class="field">Repository su cui lavorare
+          <input type="text" id="s-repo" placeholder="bombertronick/nome-progetto" value="${esc(state.cloud?.repo || '')}">
+        </label>
+        <label class="field">Chiave dell'app (se impostata nel relè)
+          <input type="text" id="s-chiave" placeholder="facoltativa" value="${esc(state.cloud?.chiave || '')}" autocomplete="off">
+        </label>
+        <p class="nota">Ogni incarico avvia una <b>sessione Claude Code nel cloud</b> tramite la Routine collegata
+          al relè: il token della Routine sta nelle variabili d'ambiente su Vercel, mai qui. L'ufficio segue
+          il lavoro dai commit sul ramo e considera consegnato quando si apre la pull request.
+          Come si configura: <code>cloud/README.md</code>.</p>
+      </div>
+      <div id="s-blocco-ponte" ${state.mode === 'endpoint' ? '' : 'hidden'}>
 
       <label class="field">Indirizzo del ponte
         <input type="url" id="s-endpoint" placeholder="http://localhost:4444/api" value="${esc(state.endpoint)}">
@@ -663,6 +686,7 @@ function openSettings() {
         cartella di lavoro del ponte (<code>node ponte/server.mjs --cartella …</code>): quello che
         vedi nell'ufficio è il lavoro che sta davvero succedendo sui file. Nessuna chiave API nel
         browser: il ponte usa il login della CLI sul tuo computer.</p>
+      </div>
 
       <div class="task-actions">
         <button class="mini-btn" id="s-prova">🔍 Prova connessione</button>
@@ -681,10 +705,29 @@ function openSettings() {
       if (!btn) return;
       modo = btn.dataset.modo;
       body.querySelectorAll('[data-modo]').forEach((b) => b.classList.toggle('on', b === btn));
+      body.querySelector('#s-blocco-cloud').hidden = modo !== 'cloud';
+      body.querySelector('#s-blocco-ponte').hidden = modo !== 'endpoint';
     });
 
     const esito = body.querySelector('#s-esito');
     body.querySelector('#s-prova').addEventListener('click', async () => {
+      if (modo === 'cloud') {
+        const relay = body.querySelector('#s-relay').value.trim();
+        const repo = body.querySelector('#s-repo').value.trim();
+        if (!relay) { esito.innerHTML = '⚠️ Scrivi prima l\'indirizzo del relè (finisce con <code>/api</code>).'; return; }
+        esito.textContent = 'Sto bussando al relè…';
+        try {
+          const d = await new CloudBackend({ relay, repo, chiave: body.querySelector('#s-chiave').value.trim() }).salute();
+          if (d.ponte !== 'agent-office-cloud') { esito.innerHTML = '❓ Qualcosa ha risposto, ma non è il relè di Agent Office.'; return; }
+          esito.innerHTML = `${d.routine ? '✅ <b>Relè attivo e Routine collegata.</b>' : '⚠️ <b>Relè attivo ma senza Routine</b>: ' + esc(d.nota || '')}`
+            + `<br>repository del relè: <code>${esc(d.repo || '— (usa quello scritto qui sopra)')}</code>`
+            + `<br>lettura GitHub: ${d.github ? 'con token (repository privati e nessun limite anonimo)' : '<i>anonima</i> — 60 richieste/ora: aggiungi GITHUB_TOKEN se puoi'}`
+            + `${d.chiaveRichiesta ? '<br>chiave dell\'app: richiesta ✓' : ''}`;
+        } catch (err) {
+          esito.innerHTML = `❌ Nessuna risposta: ${esc(err.message)}.<br>Controlla che l'app sia pubblicata su Vercel e che l'indirizzo finisca con <code>/api</code>.`;
+        }
+        return;
+      }
       const indirizzo = body.querySelector('#s-endpoint').value.trim();
       if (!indirizzo) { esito.innerHTML = '⚠️ Scrivi prima l\'indirizzo dell\'endpoint.'; return; }
       esito.textContent = 'Sto bussando al ponte…';
@@ -711,7 +754,15 @@ function openSettings() {
     body.querySelector('#s-ok').addEventListener('click', () => {
       state.project = body.querySelector('#s-progetto').value.trim() || state.project;
       $('#nome-progetto').textContent = state.project;
-      orch.setBackend(modo, body.querySelector('#s-endpoint').value.trim());
+      if (modo === 'cloud') {
+        orch.setBackend('cloud', {
+          relay: body.querySelector('#s-relay').value.trim(),
+          repo: body.querySelector('#s-repo').value.trim(),
+          chiave: body.querySelector('#s-chiave').value.trim(),
+        });
+      } else {
+        orch.setBackend(modo, body.querySelector('#s-endpoint').value.trim());
+      }
       save();
       close();
     });

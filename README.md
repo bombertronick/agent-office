@@ -73,6 +73,14 @@ L'affinità che decide l'assegnazione combina **ruolo × tipo di incarico**,
 revisore severo rimanda indietro il lavoro se trova un caso limite (al massimo due
 giri, poi si chiude).
 
+## Orchestrare dal telefono (motore cloud)
+
+Ogni incarico può avviare una **sessione Claude Code sul cloud**, sul tuo abbonamento,
+senza PC e senza chiavi sul telefono: l'app pubblicata su **Vercel** porta con sé un
+relè in `api/` che chiama il trigger API di una **Routine** di Claude Code; l'ufficio
+segue i commit sul ramo e considera consegnato alla pull request. Configurazione in
+tre passi in **[`cloud/README.md`](cloud/README.md)**.
+
 ## Collegare agenti veri
 
 In *Impostazioni* si passa da **simulazione** ad **agenti veri**: ogni incarico
@@ -132,7 +140,9 @@ Niente framework, niente passo di build: moduli ES nativi e
 ```
 .
 ├─ index.html            guscio dell'app + import map
-├─ ponte/server.mjs      ponte verso gli agenti veri (Node, zero dipendenze)
+├─ ponte/server.mjs      ponte locale verso gli agenti veri (Node, zero dipendenze)
+├─ api/                  relè serverless per il motore cloud (Vercel): fire, salute, proxy GitHub
+├─ cloud/README.md       come collegare una Routine di Claude Code e pubblicare su Vercel
 ├─ MEMORIA.md            memoria fra sessioni (importata da CLAUDE.md)
 ├─ strumenti/memoria.mjs controlla / chiude / crea la memoria
 ├─ modelli/              MEMORIA.md e CLAUDE.md da copiare in un progetto nuovo
