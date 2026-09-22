@@ -9,13 +9,16 @@
 Ufficio 3D online su GitHub Pages; ponte locale provato sul serio; memoria fra
 sessioni attiva. Nuovo: **motore cloud** — ogni incarico avvia una sessione Claude
 Code via Routine (trigger API) passando da un relè serverless in `api/` su Vercel.
-Codice pronto e sintatticamente verificato; **non ancora provato end-to-end**: serve
-la Routine creata da Valerio (token visibile una volta sola) e le variabili su Vercel.
+Progetto Vercel creato e collegato al repository (`agent-office-loval.vercel.app`,
+team `loval`, Vercel Authentication disattivata); `/api/salute` risponde dal vivo.
+**Non ancora provato end-to-end**: mancano la Routine creata da Valerio (token
+visibile una volta sola) e le variabili d'ambiente su Vercel.
 
 ## Dove sta il lavoro
 - codice: `bombertronick/agent-office`, ramo `main` (si lavora direttamente su main:
   progetto di una persona sola, ogni push è un rilascio su Pages)
-- online: https://bombertronick.github.io/agent-office/ (Pages da `main`/root)
+- online: https://bombertronick.github.io/agent-office/ (Pages, solo simulazione) e
+  https://agent-office-loval.vercel.app/ (Vercel: app + relè `api/`, per il motore cloud)
 - rami aperti non ancora uniti: nessuno
 - residuo da pulire: su `bombertronick/Nuovo` esiste ancora il ramo
   `claude/agentic-orchestration-app-3d-4bbgvu` (copia vecchia, mai unito a main):
@@ -63,7 +66,8 @@ la Routine creata da Valerio (token visibile una volta sola) e le variabili su V
 
 ## Diario (le ultime dieci righe, la più recente in alto)
 - 2026-09-22 · motore cloud: CloudBackend, relè api/ (fire, salute, proxy GitHub),
-  impostazioni a tre motori, link a sessione e PR sugli incarichi, cloud/README.md
+  impostazioni a tre motori, link a sessione e PR sugli incarichi, cloud/README.md;
+  progetto Vercel creato, proxy GitHub instradato con una riscrittura esplicita
 - 2026-09-15 · sistema di memoria fra sessioni: MEMORIA.md, CLAUDE.md che la importa,
   strumenti/memoria.mjs, il ponte che la committa a fine incarico
 - 2026-09-13 · ponte agenti veri (`ponte/server.mjs`), provato end-to-end; prova di

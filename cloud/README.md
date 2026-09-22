@@ -55,22 +55,30 @@ Regole:
 Non chiedere conferme: nessuno risponde durante l'esecuzione.
 ```
 
-## 2. Pubblica l'app su Vercel (una volta)
+## 2. L'app su Vercel (già fatto: mancano solo le variabili)
 
-Il repository contiene già le funzioni in `api/`. Su Vercel: **Add New → Project →
-importa `bombertronick/agent-office`** (nessuna impostazione di build: è statico).
-Poi *Settings → Environment Variables*:
+Il progetto esiste ed è collegato al repository — ogni push su `main` ridistribuisce:
+
+- app: **https://agent-office-loval.vercel.app/**
+- relè: **https://agent-office-loval.vercel.app/api**
+- pannello: https://vercel.com/loval/agent-office
+
+La «Vercel Authentication» è stata disattivata per questo progetto, altrimenti il
+telefono avrebbe trovato una pagina di accesso a Vercel davanti all'app.
+
+Quello che resta da fare tu, su *vercel.com/loval/agent-office → Settings →
+Environment Variables* (ambiente **Production**):
 
 | Variabile | Valore | Obbligatoria |
 |---|---|---|
 | `ROUTINE_FIRE_URL` | l'URL copiato dalla Routine (`…/routines/trig_…/fire`) | sì |
 | `ROUTINE_FIRE_TOKEN` | il token generato (`sk-ant-oat01-…`) | sì |
+| `GITHUB_TOKEN` | token GitHub **sola lettura** (fine-grained: *Contents: read*, *Pull requests: read*) | consigliata: repository privati e niente limite anonimo di 60 letture/ora |
+| `CHIAVE_APP` | una parola d'ordine che l'app deve mandare | consigliata: l'indirizzo è pubblico |
 | `GITHUB_REPO` | `bombertronick/<progetto>` — solo informativo | no |
-| `GITHUB_TOKEN` | token GitHub **sola lettura** (fine-grained, *Contents: read*, *Pull requests: read*) | consigliata: serve per repository privati e per non finire nel limite anonimo di 60 letture/ora |
-| `CHIAVE_APP` | una parola d'ordine che l'app deve mandare | consigliata se l'indirizzo è indovinabile |
 
-Ridistribuisci dopo aver salvato le variabili. L'app risponde su
-`https://<progetto>.vercel.app/` e il relè su `https://<progetto>.vercel.app/api`.
+Dopo il salvataggio: *Deployments → ⋯ → Redeploy* (le variabili entrano al
+prossimo rilascio). Poi apri `…/api/salute`: deve dire `"routine": true`.
 
 ## 3. Collega l'ufficio
 
