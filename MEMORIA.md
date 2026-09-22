@@ -58,6 +58,8 @@ visibile una volta sola) e le variabili d'ambiente su Vercel.
 3. Ciclo giorno/notte: `src/three/world.js`, luci `sun`/`fill`.
 
 ## Vincoli che non si toccano
+- Il service worker è «prima la rete»: non tornare a «prima la cache» per i file
+  dell'app, o i telefoni restano sul codice vecchio per sempre (successo il 22/09).
 - Nessun passo di build, nessun framework: moduli ES nativi serviti da file statici.
 - Niente chiavi API nel browser, mai: le tiene il ponte sul computer di Valerio.
 - `.nojekyll` alla radice: senza, Pages ignora i file che iniziano con underscore.
