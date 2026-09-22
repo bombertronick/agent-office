@@ -24,6 +24,7 @@ function boot() {
 
   const world = createWorld(canvas, labels);
   initUI(world);
+  scopriRele();
 
   scorciatoie(world);
 
@@ -54,6 +55,40 @@ function boot() {
   document.addEventListener('visibilitychange', () => { last = performance.now(); });
 
   window.ufficio = { state, orch, world };   // comodo per esplorare dalla console
+}
+
+/**
+ * Se l'app è servita insieme al relè (Vercel), il motore cloud si configura da solo:
+ * niente indirizzi da copiare sul telefono. Resta da digitare solo la chiave, se c'è.
+ */
+async function scopriRele() {
+  if (state.cloud?.relay || state.mode !== 'simulazione') return;          // già configurata a mano
+  if (!location.protocol.startsWith('http') || location.hostname.endsWith('github.io')) return;
+  const relay = `${location.origin}/api`;
+  let dati = null;
+  let chiaveRichiesta = false;
+  try {
+    const res = await fetch(`${relay}/salute`, { signal: AbortSignal.timeout(6000) });
+    if (res.status === 401) chiaveRichiesta = true;
+    else if (res.ok) dati = await res.json();
+    else return;
+  } catch { return; }                                                       // nessun relè: simulazione
+  if (dati && dati.ponte !== 'agent-office-cloud') return;
+
+  state.cloud = { relay, repo: dati?.repo || '', chiave: '' };
+  if (chiaveRichiesta || dati?.chiaveRichiesta) {
+    log({ kind: 'direttrice', who: 'Claude', text: 'Ho trovato il relè cloud accanto all\'app: mi serve solo la chiave. Apri ⚙️ Impostazioni → Cloud e digitala.' });
+    save();
+    document.dispatchEvent(new CustomEvent('apri-impostazioni'));
+    return;
+  }
+  if (dati?.routine) {
+    orch.setBackend('cloud', state.cloud);
+    log({ kind: 'direttrice', who: 'Claude', text: `Relè cloud trovato: gli incarichi partono nel cloud su ${state.cloud.repo || 'il repository della Routine'}.` });
+  } else {
+    save();
+    log({ kind: 'allarme', who: 'Claude', text: 'Relè cloud presente ma senza Routine collegata: mancano ROUTINE_FIRE_URL / ROUTINE_FIRE_TOKEN su Vercel. Resto in simulazione.' });
+  }
 }
 
 function scorciatoie(world) {

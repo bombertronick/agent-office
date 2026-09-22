@@ -399,6 +399,7 @@ function bindTopbar() {
 
   $('#btn-impostazioni').addEventListener('click', openSettings);
   $('#btn-memoria').addEventListener('click', openMemoria);
+  document.addEventListener('apri-impostazioni', () => openSettings('cloud'));
 }
 
 function bindPanels() {
@@ -644,8 +645,9 @@ async function openMemoria() {
   });
 }
 
-function openSettings() {
+function openSettings(motoreIniziale) {
   openModal('Impostazioni dello studio', (body, close) => {
+    const modoAvvio = motoreIniziale || state.mode;
     body.innerHTML = `
       <label class="field">Nome del progetto
         <input type="text" id="s-progetto" value="${esc(state.project)}" maxlength="40">
@@ -653,16 +655,16 @@ function openSettings() {
 
       <div class="field">Motore degli agenti
         <div class="opzioni" id="s-modo">
-          <button type="button" class="opzione${state.mode === 'simulazione' ? ' on' : ''}" data-modo="simulazione">
+          <button type="button" class="opzione${modoAvvio === 'simulazione' ? ' on' : ''}" data-modo="simulazione">
             <span class="big">🎬</span>Simulazione<small>tutto locale</small></button>
-          <button type="button" class="opzione${state.mode === 'endpoint' ? ' on' : ''}" data-modo="endpoint">
+          <button type="button" class="opzione${modoAvvio === 'endpoint' ? ' on' : ''}" data-modo="endpoint">
             <span class="big">🔌</span>Ponte locale<small>PC acceso</small></button>
-          <button type="button" class="opzione${state.mode === 'cloud' ? ' on' : ''}" data-modo="cloud">
+          <button type="button" class="opzione${modoAvvio === 'cloud' ? ' on' : ''}" data-modo="cloud">
             <span class="big">☁️</span>Cloud<small>Routine, dal telefono</small></button>
         </div>
       </div>
 
-      <div id="s-blocco-cloud" ${state.mode === 'cloud' ? '' : 'hidden'}>
+      <div id="s-blocco-cloud" ${modoAvvio === 'cloud' ? '' : 'hidden'}>
         <label class="field">Indirizzo del relè (l'app su Vercel)
           <input type="url" id="s-relay" placeholder="https://agent-office.vercel.app/api" value="${esc(state.cloud?.relay || (location.hostname.endsWith('vercel.app') ? `${location.origin}/api` : ''))}">
         </label>
@@ -677,7 +679,7 @@ function openSettings() {
           il lavoro dai commit sul ramo e considera consegnato quando si apre la pull request.
           Come si configura: <code>cloud/README.md</code>.</p>
       </div>
-      <div id="s-blocco-ponte" ${state.mode === 'endpoint' ? '' : 'hidden'}>
+      <div id="s-blocco-ponte" ${modoAvvio === 'endpoint' ? '' : 'hidden'}>
 
       <label class="field">Indirizzo del ponte
         <input type="url" id="s-endpoint" placeholder="http://localhost:4444/api" value="${esc(state.endpoint)}">
@@ -699,7 +701,7 @@ function openSettings() {
       <button class="mini-btn danger" id="s-reset" style="align-self:flex-start">🗑️ Azzera lo studio</button>
       <p class="nota">Cancella agenti, incarichi e statistiche salvati su questo dispositivo.</p>`;
 
-    let modo = state.mode;
+    let modo = modoAvvio;
     body.querySelector('#s-modo').addEventListener('click', (ev) => {
       const btn = ev.target.closest('[data-modo]');
       if (!btn) return;

@@ -65,6 +65,8 @@ visibile una volta sola) e le variabili d'ambiente su Vercel.
   `config.js`: se sposti le scrivanie, aggiornale insieme.
 
 ## Diario (le ultime dieci righe, la più recente in alto)
+- 2026-09-22 · l'app si autoconfigura dal relè (/api/salute) quando è servita da Vercel;
+  su Vercel impostate CHIAVE_APP e GITHUB_REPO=bombertronick/agent-office
 - 2026-09-22 · motore cloud: CloudBackend, relè api/ (fire, salute, proxy GitHub),
   impostazioni a tre motori, link a sessione e PR sugli incarichi, cloud/README.md;
   progetto Vercel creato, proxy GitHub instradato con una riscrittura esplicita

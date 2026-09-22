@@ -74,21 +74,24 @@ Environment Variables* (ambiente **Production**):
 | `ROUTINE_FIRE_URL` | l'URL copiato dalla Routine (`…/routines/trig_…/fire`) | sì |
 | `ROUTINE_FIRE_TOKEN` | il token generato (`sk-ant-oat01-…`) | sì |
 | `GITHUB_TOKEN` | token GitHub **sola lettura** (fine-grained: *Contents: read*, *Pull requests: read*) | consigliata: repository privati e niente limite anonimo di 60 letture/ora |
-| `CHIAVE_APP` | una parola d'ordine che l'app deve mandare | consigliata: l'indirizzo è pubblico |
-| `GITHUB_REPO` | `bombertronick/<progetto>` — solo informativo | no |
+| `CHIAVE_APP` | **già impostata** — una parola d'ordine che l'app deve mandare; cambiala quando vuoi | sì (c'è) |
+| `GITHUB_REPO` | **già impostata** su `bombertronick/agent-office` — il repository che l'app propone da sola; cambiala per orchestrare un altro progetto | sì (c'è) |
 
 Dopo il salvataggio: *Deployments → ⋯ → Redeploy* (le variabili entrano al
 prossimo rilascio). Poi apri `…/api/salute`: deve dire `"routine": true`.
 
-## 3. Collega l'ufficio
+## 3. Apri l'ufficio (si configura da solo)
 
-Apri l'app **dall'indirizzo Vercel** (così relè e app stanno sulla stessa origine),
-poi **⚙️ Impostazioni → Cloud** → indirizzo del relè (`…/api`), repository, chiave →
-**🔍 Prova connessione** → Salva. Da quel momento «＋ Incarico» avvia lavoro vero.
+Apri **https://agent-office-loval.vercel.app/** e basta: l'app trova il relè accanto
+a sé, legge il repository da `/api/salute` e passa al motore cloud. Se sul relè c'è
+`CHIAVE_APP`, la Direttrice ti chiede di digitarla una volta (⚙️ Impostazioni →
+Cloud → Chiave) e la ricorda sul telefono. Da lì «＋ Incarico» avvia lavoro vero.
+
+Puoi sempre cambiare repository o relè a mano nelle impostazioni. Da GitHub Pages
+l'app resta in simulazione: lì il relè non c'è.
 
 Una Routine lavora su **un** repository: per un progetto diverso, un'altra Routine
-(e un altro relè o altre variabili). L'app installata dal telefono va bene: basta
-che sia quella servita da Vercel, non da GitHub Pages — su Pages il relè non c'è.
+(e un altro relè o altre variabili).
 
 ## Cosa vedi nell'ufficio
 
